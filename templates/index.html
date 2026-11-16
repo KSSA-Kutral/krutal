@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kutral | Patagonia Fire Explorer</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    :root {
+      --bg:#0b1220; --panel:#111c2e; --panel2:#17243a; --line:#263750;
+      --text:#edf4ff; --muted:#9aabc2; --accent:#f97316; --cyan:#38bdf8;
+    }
+    * { box-sizing:border-box }
+    body { margin:0; background:var(--bg); color:var(--text); font:15px/1.5 Inter,system-ui,Arial,sans-serif }
+    header { padding:22px clamp(18px,4vw,48px); border-bottom:1px solid var(--line);
+      background:linear-gradient(115deg,#17243a,#101a2b 60%,#2a1b1b) }
+    .top { max-width:1500px; margin:auto; display:flex; align-items:center; justify-content:space-between; gap:16px }
+    .brand { display:flex; align-items:center; gap:13px }
+    .logo { width:44px;height:44px;display:grid;place-items:center;border-radius:14px;
+      background:linear-gradient(145deg,#fb923c,#dc2626);font-size:24px;box-shadow:0 8px 25px #f9731633 }
+    h1 { margin:0;font-size:25px;letter-spacing:.02em }
+    .subtitle { color:var(--muted);font-size:13px;margin-top:2px }
+    .tag { border:1px solid #39506b;border-radius:999px;padding:6px 11px;color:#c7d7eb;font-size:12px }
+    main { max-width:1500px;margin:0 auto;padding:22px clamp(14px,3vw,36px) 36px }
+    .toolbar { display:grid;grid-template-columns:repeat(6,minmax(125px,1fr));gap:12px;
+      padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:16px;margin-bottom:14px }
+    label { display:block;color:var(--muted);font-size:12px;margin-bottom:5px }
+    input,button { font:inherit }
+    input { width:100%;min-width:0;background:#0b1525;color:var(--text);border:1px solid #33465f;
+      border-radius:9px;padding:9px 10px;color-scheme:dark }
+    button { border:0;border-radius:9px;padding:10px 15px;background:var(--accent);color:#1b1008;
+      font-weight:750;cursor:pointer;align-self:end }
+    button:hover { filter:brightness(1.1) }
+    .secondary { background:#263b55;color:var(--text) }
+    .stats { display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px }
+    .stat { padding:14px 16px;background:var(--panel);border:1px solid var(--line);border-radius:14px }
+    .stat small { display:block;color:var(--muted);font-size:12px }
+    .stat strong { display:block;font-size:22px;margin-top:3px }
+    .layout { display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:14px;align-items:stretch }
+    #map { height:min(72vh,760px);min-height:470px;border-radius:16px;border:1px solid var(--line);z-index:1 }
+    aside { background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:17px }
+    h2 { margin:0 0 10px;font-size:16px }
+    .aside-section + .aside-section { border-top:1px solid var(--line);margin-top:17px;padding-top:16px }
+    .muted { color:var(--muted);font-size:12px;line-height:1.55 }
+    .legend-row { display:flex;align-items:center;gap:8px;margin:7px 0;font-size:13px }
+    .swatch { width:13px;height:13px;border-radius:4px;flex:none }
+    .status { color:#b9c9dc;font-size:12px;margin-top:9px;min-height:20px }
+    .keybox { margin-top:14px;padding:14px;background:#0d192a;border:1px solid var(--line);border-radius:12px }
+    .keybox input { margin:7px 0 }
+    .keybox button { width:100% }
+    footer { margin-top:15px;color:var(--muted);font-size:11px;line-height:1.6 }
+    .leaflet-popup-content-wrapper,.leaflet-popup-tip { background:#152238;color:#edf4ff }
+    .leaflet-control-layers { border:1px solid #33465f!important;border-radius:10px!important }
+    @media(max-width:950px) { .toolbar{grid-template-columns:repeat(3,1fr)} .layout{grid-template-columns:1fr} aside{display:grid;grid-template-columns:1fr 1fr;gap:16px} }
+    @media(max-width:600px) { .toolbar{grid-template-columns:repeat(2,1fr)} .stats{grid-template-columns:1fr 1fr} .stats .stat:last-child{grid-column:span 2} aside{display:block} #map{min-height:420px;height:65vh} .tag{display:none} }
+  </style>
+</head>
+<body>
+<header>
+  <div class="top">
+    <div class="brand">
+      <div class="logo">🔥</div>
+      <div><h1>Kutral</h1><div class="subtitle">Patagonia Fire Explorer | Satellite & environmental data</div></div>
+    </div>
+    <span class="tag">NASA FIRMS | MODIS + VIIRS</span>
+  </div>
+</header>
+
+<main>
+  <section class="toolbar">
+    <div><label for="date-start">start date</label><input id="date-start" type="date"></div>
+    <div><label for="date-end">end date</label><input id="date-end" type="date"></div>
+    <div><label for="time-start">start time (UTC)</label><input id="time-start" type="time" value="00:00"></div>
+    <div><label for="time-end">end time (UTC)</label><input id="time-end" type="time" value="23:59"></div>
+    <div><label for="grid-step">grid resolution</label>
+      <select id="grid-step" style="width:100%;padding:10px;background:#0b1525;color:white;border:1px solid #33465f;border-radius:9px">
+        <option value="2">coarse - 2°</option><option value="1" selected>balanced - 1°</option>
+        <option value="0.5">detailed - 0.5°</option><option value="0.25">very detailed - 0.25°</option>
+      </select>
+    </div>
+    <button id="refresh">update map ↗</button>
+  </section>
+  <p class="muted" style="margin:0 0 14px 4px">smaller grid cells require many more weather requests. 1° is the recommended starting resolution.</p>
+
+  <section class="stats">
+    <div class="stat"><small>satellite observations in selected period</small><strong id="count">—</strong></div>
+    <div class="stat"><small>data period</small><strong id="period" style="font-size:16px">—</strong></div>
+    <div class="stat"><small>map status</small><strong id="map-status" style="font-size:16px">waiting…</strong></div>
+  </section>
+
+  <div class="layout">
+    <div>
+      <div id="map"></div>
+      <div id="data-note" class="status"></div>
+    </div>
+    <aside>
+      <div class="aside-section">
+        <h2>Map layers</h2>
+        <p class="muted">use the layer control on the map to compare weather conditions, satellite observations, historical activity and mapped infrastructure.</p>
+        <div class="legend-row"><span class="swatch" style="background:#fff3a3"></span>Low</div>
+        <div class="legend-row"><span class="swatch" style="background:#ffd166"></span>Moderate</div>
+        <div class="legend-row"><span class="swatch" style="background:#ff9f43"></span>Elevated</div>
+        <div class="legend-row"><span class="swatch" style="background:#f04438"></span>High</div>
+        <div class="legend-row"><span class="swatch" style="background:#a80000"></span>Very high</div>
+      </div>
+      <div class="aside-section">
+        <h2>NASA FIRMS setup</h2>
+        <p class="muted" id="key-status">checking whether a MAP_KEY is configured…</p>
+        <div class="keybox">
+          <label for="map-key">your FIRMS MAP_KEY</label>
+          <input id="map-key" type="password" autocomplete="off" placeholder="Paste your key here">
+          <button id="save-key">save key locally</button>
+          <p class="muted">the key is stored in the server-side .env file. it is not sent to the map as a visible value. pls dont share your .env file</p>
+        </div>
+      </div>
+      <div class="aside-section">
+        <h2>Infrastructure</h2>
+        <p id="infrastructure-status" class="muted">zoom in to load mapped fire stations and water-related objects</p>
+        <p class="muted">select a fire-station marker, then click a destination on the map to display a generic road route estimate</p>
+      </div>
+    </aside>
+  </div>
+
+  <footer>
+    kutral is an experimental exploration tool, not an official fire-danger warning system or a certified one. satellite detections are observations of thermal anomalies and dont really necessarily represent separate confirmed fires. weather scores are experimental. acquisition time filters use UTC. infrastructure data depends on OpenStreetMap coverage and may be incomplete. road routes are not emergency response time estimates
+    <br>Data: NASA FIRMS | Open-Meteo | OpenStreetMap | WorldPop | OSRM
+  </footer>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="{{ url_for('static', filename='map.js') }}"></script>
+</body>
+</html>
